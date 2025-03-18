@@ -16,7 +16,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error opening text file: %v", err)
 	}
-	defer file.Close()
 	
 	ch := getLinesChannel(file)
 	for value := range ch {
@@ -28,6 +27,7 @@ func main() {
 func getLinesChannel(f io.ReadCloser) <-chan string {
 	ch := make(chan string)
 	go func() {
+		defer f.Close()
 		defer close(ch)
 		currentLineContents := ""
 
@@ -42,12 +42,12 @@ func getLinesChannel(f io.ReadCloser) <-chan string {
 					break
 				}
 				fmt.Println("Error reading file:", err.Error())
-				break
+				return
 			}
 		str := string(buffer[:n])
 		parts := strings.Split(str, "\n")
 		for i := 0; i < len(parts)-1; i++ {
-			ch <- currentLineContents + parts[i]
+			ch <- fmt.Sprintf("%s%s", currentLineContents, parts[i])
 			currentLineContents = ""
 		}
 		currentLineContents += parts[len(parts)-1]
