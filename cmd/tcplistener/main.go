@@ -1,12 +1,10 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"io"
+	"httpfromtcp/internal/request"
 	"log"
 	"net"
-	"strings"
 )
 
 const port = ":42069"
@@ -25,12 +23,17 @@ func main() {
 		}
 		fmt.Println("Accepted connection from", conn.RemoteAddr())
 
-		linesChan := getLinesChannel(conn)
-
-		for line := range linesChan {
-			fmt.Println(line)
+		req, err := request.RequestFromReader(conn)
+		if err != nil {
+			log.Fatalf("error reading request: %v", err)
 		}
-		fmt.Printf("Connection to %s closed", conn.RemoteAddr())
+
+		fmt.Println("Request line:")
+		fmt.Printf("- Method: %s\n", req.RequestLine.Method)
+		fmt.Printf("- Target: %s\n", req.RequestLine.RequestTarget)
+		fmt.Printf("- Version: %s\n", req.RequestLine.HttpVersion)
+
+		fmt.Printf("Connection to %s closed\n", conn.RemoteAddr())
 		err = conn.Close()
 		if err != nil {
 			fmt.Printf("error closing connection: %v", err)
@@ -38,6 +41,7 @@ func main() {
 	}
 }
 
+/*
 func getLinesChannel(f io.ReadCloser) <-chan string {
 	ch := make(chan string)
 	go func() {
@@ -69,3 +73,4 @@ func getLinesChannel(f io.ReadCloser) <-chan string {
 	}()
 	return ch
 }
+*/
