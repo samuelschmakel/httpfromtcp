@@ -7,10 +7,14 @@ import (
 	"unicode"
 )
 
-type Headers map[string]string
-
 const crlf = "\r\n"
 const specialChars = "!#$%&'*+-.^_`|~"
+
+type Headers map[string]string
+
+func NewHeaders() Headers {
+	return map[string]string{}
+}
 
 func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	idx := bytes.Index(data, []byte(crlf))
@@ -62,10 +66,6 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	}
 	
 	return idx + len(crlf), false, nil
-}
-
-func NewHeaders() Headers {
-	return map[string]string{}
 }
 
 func validTokens(s string, specialChars string) bool {
