@@ -6,13 +6,16 @@ import (
 	"fmt"
 	"httpfromtcp/internal/headers"
 	"io"
+	"strconv"
 	"strings"
 )
 
 type Request struct {
 	RequestLine RequestLine
 	Headers headers.Headers
+	Body []byte
 	state requestState // 0 for "initialized", 1 for "done"
+	bodyLengthRead int
 }
 
 type RequestLine struct {
@@ -29,6 +32,7 @@ type requestState int
 const (
 	requestStateInitialized requestState = iota
 	requestStateParsingHeaders
+	requestStateParsingBody
 	requestStateDone
 )
 
@@ -36,6 +40,7 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 	r := &Request{
 		state: requestStateInitialized,
 		Headers: make(map[string]string),
+		Body: make([]byte, 0),
 	}
 
 	buf := make([]byte, bufferSize)
@@ -50,9 +55,15 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 
 		n, err := reader.Read(buf[readToIndex:])
 		// Handle real errors
-		if err != nil && err != io.EOF {
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				if r.state != requestStateDone {
+					return nil, fmt.Errorf("incomplete request, in state: %d, read n bytes on EOF: %d", r.state, n)
+				}
+				break
+			}
 			return nil, err
-		} 
+		}
 		readToIndex += n
 
 		parsedBytes, parseErr := r.parse(buf[:readToIndex])
@@ -154,9 +165,28 @@ func (r *Request) parseSingle(data []byte) (int, error) {
 		}
 
 		if done {
-			r.state = requestStateDone
+			r.state = requestStateParsingBody
 		}
 		return n, nil
+	case requestStateParsingBody:
+		contentLenStr, ok := r.Headers.Get("Content-Length")
+		if !ok {
+			r.state = requestStateDone
+			return len(data), nil
+		}
+		contentLen, err := strconv.Atoi(contentLenStr)
+		if err != nil {
+			return 0, fmt.Errorf("error: Content-Length could not be converted to an integer: %s", contentLenStr)
+		}
+		r.Body = append(r.Body, data...)
+		r.bodyLengthRead += len(data)
+		if r.bodyLengthRead > contentLen {
+			return 0, fmt.Errorf("error: Content-Length too large")
+		}
+		if r.bodyLengthRead == contentLen {
+			r.state = requestStateDone
+		}
+		return len(data), nil
 
 	case requestStateDone:
 		return 0, fmt.Errorf("error: trying to read data in a done state")

@@ -68,6 +68,12 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	return idx + len(crlf), false, nil
 }
 
+func (h Headers) Get(key string) (string, bool) {
+	key = strings.ToLower(key)
+	v, ok := h[key]
+	return v, ok
+}
+
 func validTokens(s string, specialChars string) bool {
 	for _, r := range s {
 		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && !strings.ContainsRune(specialChars, r) {
