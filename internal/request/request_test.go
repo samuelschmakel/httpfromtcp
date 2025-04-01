@@ -72,7 +72,7 @@ func TestRequestHeadersParse (t *testing.T) {
 		data: "GET / HTTP/1.1\r\nHost: ",
 		numBytesPerRead: 3,
 	}
-	r, err = RequestFromReader(reader)
+	_, err = RequestFromReader(reader)
 	require.Error(t, err)
 
 	// Test: Malformed Header
@@ -109,9 +109,9 @@ func TestRequestHeadersParse (t *testing.T) {
 	
 	// Test: Missing End of Headers
 	reader = &chunkReader{
-		data: "GET / HTTP/1.1\r\nHost: localhost:42069\r\nUser-Agent: curl/7.81.0\r\nAccept: */*\r\n",
+		data: "GET / HTTP/1.1\r\nHost: localhost:42069\r\nUser-Agent: curl/7.81.0\r\nAccept: */*",
 		numBytesPerRead: 3,
 	}
 	_, err = RequestFromReader(reader)
-	require.NoError(t, err)
+	require.Error(t, err)
 }
