@@ -38,6 +38,9 @@ func main() {
 			fmt.Printf("- %s: %s\n", key, value)
 		}
 
+		fmt.Println("Body:")
+		fmt.Println(string(req.Body))
+
 		fmt.Printf("Connection to %s closed\n", conn.RemoteAddr())
 		err = conn.Close()
 		if err != nil {
