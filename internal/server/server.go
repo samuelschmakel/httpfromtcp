@@ -2,23 +2,29 @@ package server
 
 import (
 	"fmt"
+	"httpfromtcp/internal/request"
+	"httpfromtcp/internal/response"
 	"log"
 	"net"
 	"sync/atomic"
 )
 
+type Handler func(w *response.Writer, req *request.Request)
+
 type Server struct {
+	handler Handler
 	listener net.Listener
 	closed atomic.Bool
 }
 
-func Serve(port int) (*Server, error) {
+func Serve(port int, handler Handler) (*Server, error) {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return nil, err
 	}
 	
 	s := Server{
+		handler: handler,
 		listener: listener,
 	}
 	go s.listen()
@@ -50,13 +56,11 @@ func (s *Server) listen() {
 
 func (s *Server) handle(conn net.Conn) {
 	defer conn.Close()
-	response := "HTTP/1.1 200 OK\r\n" + // Status line
-		"Content-Type: text/plain\r\n" + // Example header
-		"\r\n" + // Blank line to separate headers from the body
-		"Hello World!\n" // Body
-	
-	_, err := conn.Write([]byte(response))
+	req, err := request.RequestFromReader(conn)
 	if err != nil {
-		log.Printf("Error writing to connection: %v", err)
+		return
 	}
+	responseWriter := response.NewWriter(conn)
+	s.handler(responseWriter, req)
+	return
 }

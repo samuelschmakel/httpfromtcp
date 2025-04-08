@@ -82,3 +82,7 @@ func validTokens(s string, specialChars string) bool {
 	}
 	return true
 }
+
+func (h Headers) Override(key string, value string) {
+	h[key] = value
+}
