@@ -25,12 +25,3 @@ func getStatusLine(statusCode StatusCode) []byte {
 	}
 	return []byte(fmt.Sprintf("HTTP/1.1 %d %s\r\n", statusCode, reasonPhrase))
 }
-
-func (w *Writer) WriteStatusLine(statusCode StatusCode) error {
-	if w.writerState != responseStateWritingStatusLine {
-		return fmt.Errorf("incorrect order for writing status")
-	}
-	_, err := w.W.Write(getStatusLine(statusCode))
-	w.writerState = responseStateWritingHeaders
-	return err
-}

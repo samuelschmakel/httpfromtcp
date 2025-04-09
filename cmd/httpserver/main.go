@@ -27,47 +27,59 @@ func main() {
 }
 
 func handler(w *response.Writer, req *request.Request) {
-	html := ""
 	if req.RequestLine.RequestTarget == "/yourproblem" {
-		html = `
-		<html>
+		handler400(w, req)
+		return
+	}
+	if req.RequestLine.RequestTarget == "/myproblem" {
+		handler500(w, req)
+		return
+	}
+	handler200(w, req)
+	return
+}
+
+func handler400(w *response.Writer, _ *request.Request) {
+	w.WriteStatusLine(response.StatusCodeBadRequest)
+	body := []byte(`<html>
 			<head>
-				<title>200 OK</title>
+				<title>400 Bad Request</title>
 			</head>
 			<body>
 				<h1>Success!</h1>
 				<p>Your request honestly kinda sucked.</p>
 			</body>
 		</html>
-	`
-		bytes := []byte(html)
-		w.WriteStatusLine(response.StatusCodeBadRequest)
-		h := response.GetDefaultHeaders(len(bytes))
-		h.Override("content-type", "text/html")
-		w.WriteHeaders(h)
-		w.WriteBody(bytes)
+		`)
+	h := response.GetDefaultHeaders(len(body))
+	h.Override("Content-Type", "text/html")
+	w.WriteHeaders(h)
+	w.WriteBody(body)
+	return
+}
 
-	} else if req.RequestLine.RequestTarget == "/myproblem" {
-		html = `
-		<html>
+func handler500(w *response.Writer, _ *request.Request) {
+	w.WriteStatusLine(response.StatusCodeInternalServerError)
+	body := []byte(`<html>
 			<head>
 				<title>500 Internal Server Error</title>
 			</head>
 			<body>
-				<h1>Internal Server Error</h1>
+				<h1>Success!</h1>
 				<p>Okay, you know what? This one is on me.</p>
 			</body>
 		</html>
-	`
-		bytes := []byte(html)
-		w.WriteStatusLine(response.StatusCodeInternalServerError)
-		h := response.GetDefaultHeaders(len(bytes))
-		h.Override("content-type", "text/html")
-		w.WriteHeaders(h)
-		w.WriteBody(bytes)
-	} else {
-		html = `
-		<html>
+		`)
+	h := response.GetDefaultHeaders(len(body))
+	h.Override("Content-Type", "text/html")
+	w.WriteHeaders(h)
+	w.WriteBody(body)
+	return
+}
+
+func handler200(w *response.Writer, _ *request.Request) {
+	w.WriteStatusLine(response.StatusCodeSuccess)
+	body := []byte(`<html>
 			<head>
 				<title>200 OK</title>
 			</head>
@@ -76,12 +88,10 @@ func handler(w *response.Writer, req *request.Request) {
 				<p>Your request was an absolute banger.</p>
 			</body>
 		</html>
-	`
-		bytes := []byte(html)
-		w.WriteStatusLine(response.StatusCodeSuccess)
-		h := response.GetDefaultHeaders(len(bytes))
-		h.Override("content-type", "text/html")
-		w.WriteHeaders(h)
-		w.WriteBody(bytes)
-	}
+		`)
+	h := response.GetDefaultHeaders(len(body))
+	h.Override("Content-Type", "text/html")
+	w.WriteHeaders(h)
+	w.WriteBody(body)
+	return
 }

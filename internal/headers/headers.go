@@ -74,6 +74,15 @@ func (h Headers) Get(key string) (string, bool) {
 	return v, ok
 }
 
+func (h Headers) Set(key, value string) {
+	key = strings.ToLower(key)
+	v, ok := h[key]
+	if ok {
+		value = strings.Join([]string{v, value,}, ", ")
+	}
+	h[key] = value
+}
+
 func validTokens(s string, specialChars string) bool {
 	for _, r := range s {
 		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && !strings.ContainsRune(specialChars, r) {
@@ -84,5 +93,6 @@ func validTokens(s string, specialChars string) bool {
 }
 
 func (h Headers) Override(key string, value string) {
+	key = strings.ToLower(key)
 	h[key] = value
 }
