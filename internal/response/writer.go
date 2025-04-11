@@ -17,6 +17,7 @@ const (
 	writerStateStatusLine writerState = iota
 	writerStateHeaders
 	writerStateBody
+	writerStateTrailers
 )
 
 func NewWriter(w io.Writer) *Writer {
@@ -55,6 +56,7 @@ func (w *Writer) WriteBody(p []byte) (int, error) {
 	if w.writerState != writerStateBody {
 		return 0, fmt.Errorf("incorrect order for writing body")
 	}
+	defer func() {w.writerState = writerStateTrailers}()
 	return w.writer.Write(p)
 }
 
@@ -86,5 +88,24 @@ func (w *Writer) WriteChunkedBody(p []byte) (int, error) {
     return nTotal, err
 }
 func (w *Writer) WriteChunkedBodyDone() (int, error) {
-	return w.writer.Write([]byte("0\r\n\r\n"))
+	defer func() {w.writerState = writerStateTrailers}()
+	return w.writer.Write([]byte("0\r\n"))
+}
+
+func (w *Writer) WriteTrailers(h headers.Headers) error {
+	if w.writerState != writerStateTrailers {
+		fmt.Println("returning error")
+		return fmt.Errorf("writing trailers out of order: %v", w.writerState)
+	}
+	for key, value := range h {
+		message := fmt.Sprintf("%s: %s\r\n", key, value)
+		fmt.Printf("message is: %s", message)
+		_, err := w.writer.Write([]byte(message))
+		if err != nil {
+			return fmt.Errorf("error writing headers: %s", err.Error())
+		}
+	}
+
+	_, err := w.writer.Write([]byte("\r\n"))
+	return err
 }

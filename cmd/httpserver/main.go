@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"fmt"
+	"httpfromtcp/internal/headers"
 	"httpfromtcp/internal/request"
 	"httpfromtcp/internal/response"
 	"httpfromtcp/internal/server"
@@ -9,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 )
@@ -117,12 +121,15 @@ func proxyHandler(w *response.Writer, req *request.Request) {
 
 	w.WriteStatusLine(response.StatusCodeSuccess)
 	h := response.GetDefaultHeaders(0)
+	h.Set("Trailer", "X-Content-SHA256")
+	h.Set("Trailer", "X-Content-Length")
 	h.Remove("Content-Length")
 	h.Override("Transfer-Encoding", "chunked")
 	w.WriteHeaders(h)
 
 	const maxChunkSize = 1024
-	buffer := make([]byte, maxChunkSize) // buffer size of 32
+	buffer := make([]byte, maxChunkSize) // buffer size of 1024
+	var respBody bytes.Buffer
 	for {
 		n, err := resp.Body.Read(buffer)
 		if n > 0 {
@@ -131,6 +138,7 @@ func proxyHandler(w *response.Writer, req *request.Request) {
 				fmt.Println("Error writing chunked body:", err)
 				break;
 			}
+			respBody.Write(buffer[:n])
 		}
 		fmt.Printf("The length of data being read is: %d\n", n)
 
@@ -143,4 +151,18 @@ func proxyHandler(w *response.Writer, req *request.Request) {
 	if err != nil {
 		fmt.Println("Error writing chunked body done:", err)
 	}
+
+	data := respBody.Bytes()
+	hash := sha256.Sum256(data)
+	strHash := fmt.Sprintf("%x", hash)
+	bodyLen := len(data)
+
+	t := headers.Headers{}
+	t.Set("X-Content-SHA256", strHash)
+	t.Set("X-Content-Length", strconv.Itoa(bodyLen))
+	err = w.WriteTrailers(t)
+	if err != nil {
+		fmt.Println("Error writing trailers")
+	}
+
 }
