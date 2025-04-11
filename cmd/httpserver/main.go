@@ -1,12 +1,15 @@
 package main
 
 import (
+	"fmt"
 	"httpfromtcp/internal/request"
 	"httpfromtcp/internal/response"
 	"httpfromtcp/internal/server"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 )
 
@@ -33,6 +36,10 @@ func handler(w *response.Writer, req *request.Request) {
 	}
 	if req.RequestLine.RequestTarget == "/myproblem" {
 		handler500(w, req)
+		return
+	}
+	if strings.HasPrefix(req.RequestLine.RequestTarget, "/httpbin") {
+		handlerHTTPbin(w, req)
 		return
 	}
 	handler200(w, req)
@@ -94,4 +101,40 @@ func handler200(w *response.Writer, _ *request.Request) {
 	w.WriteHeaders(h)
 	w.WriteBody(body)
 	return
+}
+
+func handlerHTTPbin(w *response.Writer, req *request.Request) {
+	path := strings.TrimPrefix(req.RequestLine.RequestTarget, "/httpbin")
+	path = "https://httpbin.org" + path
+	
+	resp, err := http.Get(path)
+	if err != nil {
+		fmt.Printf("error accessing server: %v\n", err)
+		handler500(w, req)
+		return
+	}
+	defer resp.Body.Close()
+	w.WriteStatusLine(response.StatusCodeSuccess)
+	h := response.GetDefaultHeaders(0)
+	h.Remove("Content-Length")
+	h.Set("Transfer-Encoding", "chunked")
+	w.WriteHeaders(h)
+
+	buffer := make([]byte, 32) // buffer size of 32
+	for {
+		n, err := resp.Body.Read(buffer)
+		if n > 0 {
+			w.WriteChunkedBody(buffer[:n])
+		}
+		fmt.Printf("The length of data being read is: %d\n", n)
+
+		if err != nil {
+			// This includes err == io.EOF
+			break
+		}
+	}
+	w.WriteChunkedBodyDone()
+
+	fmt.Println(h, buffer)
+
 }
