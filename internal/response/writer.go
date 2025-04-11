@@ -63,14 +63,27 @@ func (w *Writer) WriteChunkedBody(p []byte) (int, error) {
     if w.writerState != writerStateBody {
         return 0, fmt.Errorf("incorrect order for writing body")
     }
-    hex := fmt.Sprintf("%x", len(p))
-    w.writer.Write([]byte(hex + "\r\n"))
-    n, err := w.writer.Write(p)
+	chunkSize := len(p)
+
+	nTotal := 0
+    n, err := fmt.Fprintf(w.writer, "%x\r\n", chunkSize)
+	if err != nil {
+		return nTotal, err
+	}
+	nTotal += n
+
+    n, err = w.writer.Write(p)
     if err != nil {
-        return n, err
+        return nTotal, err
     }
-    _, err = w.writer.Write([]byte("\r\n"))
-    return n, err
+	nTotal += n
+
+    n, err = w.writer.Write([]byte("\r\n"))
+	if err != nil {
+		return nTotal, err
+	}
+	nTotal += n
+    return nTotal, err
 }
 func (w *Writer) WriteChunkedBodyDone() (int, error) {
 	return w.writer.Write([]byte("0\r\n\r\n"))

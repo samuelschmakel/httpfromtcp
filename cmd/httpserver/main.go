@@ -30,16 +30,16 @@ func main() {
 }
 
 func handler(w *response.Writer, req *request.Request) {
+	if strings.HasPrefix(req.RequestLine.RequestTarget, "/httpbin") {
+		proxyHandler(w, req)
+		return
+	}
 	if req.RequestLine.RequestTarget == "/yourproblem" {
 		handler400(w, req)
 		return
 	}
 	if req.RequestLine.RequestTarget == "/myproblem" {
 		handler500(w, req)
-		return
-	}
-	if strings.HasPrefix(req.RequestLine.RequestTarget, "/httpbin") {
-		handlerHTTPbin(w, req)
 		return
 	}
 	handler200(w, req)
@@ -103,28 +103,34 @@ func handler200(w *response.Writer, _ *request.Request) {
 	return
 }
 
-func handlerHTTPbin(w *response.Writer, req *request.Request) {
+func proxyHandler(w *response.Writer, req *request.Request) {
 	path := strings.TrimPrefix(req.RequestLine.RequestTarget, "/httpbin")
-	path = "https://httpbin.org" + path
-	
-	resp, err := http.Get(path)
+	url := "https://httpbin.org" + path
+	fmt.Println("Proxying to", url)
+	resp, err := http.Get(url)
 	if err != nil {
 		fmt.Printf("error accessing server: %v\n", err)
 		handler500(w, req)
 		return
 	}
 	defer resp.Body.Close()
+
 	w.WriteStatusLine(response.StatusCodeSuccess)
 	h := response.GetDefaultHeaders(0)
 	h.Remove("Content-Length")
-	h.Set("Transfer-Encoding", "chunked")
+	h.Override("Transfer-Encoding", "chunked")
 	w.WriteHeaders(h)
 
-	buffer := make([]byte, 32) // buffer size of 32
+	const maxChunkSize = 1024
+	buffer := make([]byte, maxChunkSize) // buffer size of 32
 	for {
 		n, err := resp.Body.Read(buffer)
 		if n > 0 {
-			w.WriteChunkedBody(buffer[:n])
+			_, err = w.WriteChunkedBody(buffer[:n])
+			if err != nil {
+				fmt.Println("Error writing chunked body:", err)
+				break;
+			}
 		}
 		fmt.Printf("The length of data being read is: %d\n", n)
 
@@ -133,8 +139,8 @@ func handlerHTTPbin(w *response.Writer, req *request.Request) {
 			break
 		}
 	}
-	w.WriteChunkedBodyDone()
-
-	fmt.Println(h, buffer)
-
+	_, err = w.WriteChunkedBodyDone()
+	if err != nil {
+		fmt.Println("Error writing chunked body done:", err)
+	}
 }
